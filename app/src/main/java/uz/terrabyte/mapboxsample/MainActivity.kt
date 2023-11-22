@@ -3,27 +3,24 @@ package uz.terrabyte.mapboxsample
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Toast
+import androidx.appcompat.content.res.AppCompatResources
 import com.mapbox.android.gestures.MoveGestureDetector
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.MapView
 import com.mapbox.maps.Style
+import com.mapbox.maps.extension.style.expressions.dsl.generated.interpolate
+import com.mapbox.maps.plugin.LocationPuck2D
 import com.mapbox.maps.plugin.gestures.OnMoveListener
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorBearingChangedListener
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
-import androidx.appcompat.content.res.AppCompatResources
-import com.mapbox.maps.extension.style.expressions.dsl.generated.interpolate
-import com.mapbox.maps.plugin.LocationPuck2D
+import uz.terrabyte.utills.LocationPermissionHelper
 import java.lang.ref.WeakReference
-
-
-var mapView: MapView? = null
-
 
 class MainActivity : AppCompatActivity() {
 
-
+    private lateinit var locationPermissionHelper: LocationPermissionHelper
 
     private val onIndicatorBearingChangedListener = OnIndicatorBearingChangedListener {
         mapView.getMapboxMap().setCamera(CameraOptions.Builder().bearing(it).build())
@@ -45,14 +42,19 @@ class MainActivity : AppCompatActivity() {
 
         override fun onMoveEnd(detector: MoveGestureDetector) {}
     }
+
     private lateinit var mapView: MapView
+
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         mapView = MapView(this)
         setContentView(mapView)
-
+        locationPermissionHelper = LocationPermissionHelper(WeakReference(this))
+        locationPermissionHelper.checkPermissions {
             onMapReady()
+        }
     }
 
     private fun onMapReady() {
@@ -80,11 +82,11 @@ class MainActivity : AppCompatActivity() {
             this.locationPuck = LocationPuck2D(
                 bearingImage = AppCompatResources.getDrawable(
                     this@MainActivity,
-                    R.drawable.ic_launcher_background,
+                    R.drawable.ic_somekinda,
                 ),
                 shadowImage = AppCompatResources.getDrawable(
                     this@MainActivity,
-                    R.drawable.ic_launcher_background,
+                    R.drawable.ic_somekinda,
                 ),
                 scaleExpression = interpolate {
                     linear()
@@ -120,6 +122,15 @@ class MainActivity : AppCompatActivity() {
         mapView.location
             .removeOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
         mapView.gestures.removeOnMoveListener(onMoveListener)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        locationPermissionHelper.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
 }

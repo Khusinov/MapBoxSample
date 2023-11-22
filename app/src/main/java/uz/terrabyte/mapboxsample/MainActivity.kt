@@ -3,9 +3,14 @@ package uz.terrabyte.mapboxsample
 import com.mapbox.geojson.Point
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.content.res.AppCompatResources
 import com.mapbox.android.gestures.MoveGestureDetector
+import com.mapbox.api.directions.v5.DirectionsCriteria
+import com.mapbox.api.directions.v5.MapboxDirections
+import com.mapbox.api.directions.v5.models.DirectionsResponse
+import com.mapbox.common.TileStoreOptions.MAPBOX_ACCESS_TOKEN
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.MapView
 import com.mapbox.maps.Style
@@ -21,6 +26,10 @@ import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorBearingChangedListener
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import uz.terrabyte.mapboxsample.databinding.ActivityMainBinding
 import uz.terrabyte.utills.LocationPermissionHelper
 import java.lang.ref.WeakReference
 
@@ -50,17 +59,69 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var mapView: MapView
-
+    private lateinit var binding: ActivityMainBinding
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         mapView = MapView(this)
-        setContentView(mapView)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
         locationPermissionHelper = LocationPermissionHelper(WeakReference(this))
         locationPermissionHelper.checkPermissions {
             onMapReady()
         }
+
+        binding.button.setOnClickListener {
+            drawDirection()
+        }
+
+
+    }
+
+    private fun drawDirection() {
+
+        var origin = Point.fromLngLat(-3.588098, 37.176164);
+
+        // Set the destination location to the Plaza del Triunfo in Granada, Spain.
+        var destination = Point.fromLngLat(-3.601845, 37.184080);
+
+
+        val client = MapboxDirections.builder().
+
+        client?.enqueueCall(object : Callback<DirectionsResponse> {
+            override fun onResponse(
+                call: Call<DirectionsResponse>,
+                response: Response<DirectionsResponse>
+            ) {
+
+                if (response.body() == null) {
+                    Log.d(
+                        "No routes found, make sure you set the right user and access token.",
+                        "ddd"
+                    )
+                    return
+                } else if (response.body()!!.routes().size < 1) {
+                    Log.d("No routes found", "ddd")
+                    return
+                }
+
+// Get the directions route
+                val response = response
+
+                val currentRoute = response.body()!!.routes()[0]
+
+            }
+
+            override fun onFailure(call: Call<DirectionsResponse>, throwable: Throwable) {
+
+                Log.d("Error: ", " ${throwable.message} ")
+
+            }
+        })
+
+
     }
 
     private fun onMapReady() {
@@ -134,8 +195,12 @@ class MainActivity : AppCompatActivity() {
                 }.toJson()
             )
         }
-        locationComponentPlugin.addOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
-        locationComponentPlugin.addOnIndicatorBearingChangedListener(onIndicatorBearingChangedListener)
+        locationComponentPlugin.addOnIndicatorPositionChangedListener(
+            onIndicatorPositionChangedListener
+        )
+        locationComponentPlugin.addOnIndicatorBearingChangedListener(
+            onIndicatorBearingChangedListener
+        )
     }
 
     private fun onCameraTrackingDismissed() {

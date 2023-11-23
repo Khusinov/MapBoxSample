@@ -105,8 +105,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun initNavigation() {
         MapboxNavigationApp.setup(
-            NavigationOptions.Builder(this)
-                .accessToken(getString(R.string.mapbox_access_token))
+            NavigationOptions.Builder(this).accessToken(getString(R.string.mapbox_access_token))
                 .build()
         )
     }
@@ -123,8 +122,7 @@ class MainActivity : AppCompatActivity() {
 
         val routeOptions = RouteOptions.builder()
 // applies the default parameters to route options
-            .applyDefaultNavigationOptions()
-            .applyLanguageAndVoiceUnitOptions(this)
+            .applyDefaultNavigationOptions().applyLanguageAndVoiceUnitOptions(this)
 // lists the coordinate pair i.e. origin and destination
 // If you want to specify waypoints you can pass list of points instead of null
             .coordinatesList(listOf(originPoint, destination))
@@ -142,76 +140,68 @@ class MainActivity : AppCompatActivity() {
 //                )
 //            )
             .build()
-        mapboxNavigation.requestRoutes(
-            routeOptions,
-            object : NavigationRouterCallback {
-                override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
+        mapboxNavigation.requestRoutes(routeOptions, object : NavigationRouterCallback {
+            override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
 // This particular callback is executed if you invoke
 // mapboxNavigation.cancelRouteRequest()
 //                    binding.responseTextView.text = "route request canceled"
 //                    binding.fetchARouteButton.visibility = VISIBLE
-                }
+            }
 
-                override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
+            override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
 //                    binding.responseTextView.text = """route request failed with:$reasons
 //""".trimIndent()
-                    Log.e("LOG_TAG", "route request failed with $reasons")
+                Log.e("LOG_TAG", "route request failed with $reasons")
 //                    binding.fetchARouteButton.visibility = VISIBLE
-                }
-
-                override fun onRoutesReady(
-                    routes: List<NavigationRoute>,
-                    routerOrigin: RouterOrigin
-                ) {
-// GSON instance used only to print the response prettily
-                    val gson = GsonBuilder().setPrettyPrinting().create()
-                    val json = routes.map {
-                        gson.toJson(
-                            JsonParser.parseString(it.directionsRoute.toJson())
-                        )
-                    }
-                    mapboxNavigation.setNavigationRoutes(routes)
-
-                    Log.d("TAG", "onRoutesReady: $json")
-                 //   binding.responseTextView.text = """|routes ready (origin: ${routerOrigin::class.simpleName}):|$json""".trimMargin()
-                }
             }
-        )
-      //  binding.fetchARouteButton.visibility = GONE
+
+            override fun onRoutesReady(
+                routes: List<NavigationRoute>, routerOrigin: RouterOrigin
+            ) {
+// GSON instance used only to print the response prettily
+                val gson = GsonBuilder().setPrettyPrinting().create()
+                val json = routes.map {
+                    gson.toJson(
+                        JsonParser.parseString(it.directionsRoute.toJson())
+                    )
+                }
+                mapboxNavigation.setNavigationRoutes(routes)
+
+                Log.d("TAG", "onRoutesReady: $json")
+                //   binding.responseTextView.text = """|routes ready (origin: ${routerOrigin::class.simpleName}):|$json""".trimMargin()
+            }
+        })
+        //  binding.fetchARouteButton.visibility = GONE
     }
 
     private fun onMapReady(mapboxMap: MapboxMap) {
 
         map = mapboxMap
         mapView.getMapboxMap().setCamera(
-            CameraOptions.Builder()
-                .zoom(14.0)
-                .build()
+            CameraOptions.Builder().zoom(14.0).build()
         )
 
         mapView.getMapboxMap().setCamera(
             CameraOptions.Builder().center(
                 Point.fromLngLat(
-                    LATITUDE,
-                    LONGITUDE
+                    LATITUDE, LONGITUDE
                 )
             ).zoom(ZOOM).build()
         )
 
         mapView.getMapboxMap().loadStyle(
-            (
-                    style(styleUri = Style.MAPBOX_STREETS) {
-                        +geoJsonSource(GEOJSON_SOURCE_ID) {
-                            url("asset://from_crema_to_council_crest.geojson")
-                        }
-                        +lineLayer("linelayer", GEOJSON_SOURCE_ID) {
-                            lineCap(LineCap.ROUND)
-                            lineJoin(LineJoin.ROUND)
-                            lineOpacity(0.7)
-                            lineWidth(8.0)
-                            lineColor("#888")
-                        }
-                    })
+            (style(styleUri = Style.MAPBOX_STREETS) {
+                +geoJsonSource(GEOJSON_SOURCE_ID) {
+                    url("asset://from_crema_to_council_crest.geojson")
+                }
+                +lineLayer("linelayer", GEOJSON_SOURCE_ID) {
+                    lineCap(LineCap.ROUND)
+                    lineJoin(LineJoin.ROUND)
+                    lineOpacity(0.7)
+                    lineWidth(8.0)
+                    lineColor("#888")
+                }
+            })
         )
     }
 
@@ -227,12 +217,10 @@ class MainActivity : AppCompatActivity() {
                 bearingImage = AppCompatResources.getDrawable(
                     this@MainActivity,
                     R.drawable.ic_somekinda,
-                ),
-                shadowImage = AppCompatResources.getDrawable(
+                ), shadowImage = AppCompatResources.getDrawable(
                     this@MainActivity,
                     R.drawable.ic_somekinda,
-                ),
-                scaleExpression = interpolate {
+                ), scaleExpression = interpolate {
                     linear()
                     zoom()
                     stop {
@@ -256,26 +244,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun onCameraTrackingDismissed() {
         Toast.makeText(this, "onCameraTrackingDismissed", Toast.LENGTH_SHORT).show()
-        mapView.location
-            .removeOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
-        mapView.location
-            .removeOnIndicatorBearingChangedListener(onIndicatorBearingChangedListener)
+        mapView.location.removeOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
+        mapView.location.removeOnIndicatorBearingChangedListener(onIndicatorBearingChangedListener)
         mapView.gestures.removeOnMoveListener(onMoveListener)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        mapView.location
-            .removeOnIndicatorBearingChangedListener(onIndicatorBearingChangedListener)
-        mapView.location
-            .removeOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
+        mapView.location.removeOnIndicatorBearingChangedListener(onIndicatorBearingChangedListener)
+        mapView.location.removeOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
         mapView.gestures.removeOnMoveListener(onMoveListener)
     }
 
     override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
+        requestCode: Int, permissions: Array<String>, grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         locationPermissionHelper.onRequestPermissionsResult(requestCode, permissions, grantResults)

@@ -176,7 +176,7 @@ class MainActivity : AppCompatActivity() {
         Log.d("TAG", "onMapReady: ready")
         map = mapboxMap
 
-        mapView.getMapboxMap().setCamera(
+        map.setCamera(
             CameraOptions.Builder().center(
                 Point.fromLngLat(
                     LONGITUDE, LATITUDE
@@ -184,29 +184,13 @@ class MainActivity : AppCompatActivity() {
             ).zoom(ZOOM).build()
         )
 
-        mapView.getMapboxMap().loadStyle(
-            (style(styleUri = Style.MAPBOX_STREETS) {
-                +geoJsonSource(GEOJSON_SOURCE_ID) {
-                    url("asset://from_crema_to_council_crest.geojson")
-                }
-                +lineLayer("linelayer", GEOJSON_SOURCE_ID) {
-                    lineCap(LineCap.ROUND)
-                    lineJoin(LineJoin.ROUND)
-                    lineOpacity(0.7)
-                    lineWidth(8.0)
-                    lineColor("#888")
-                }
-            })
+        map.loadStyle(
+            (style(styleUri = Style.MAPBOX_STREETS) {})
         )
     }
 
     private fun setupGesturesListener() {
         mapView.gestures.addOnMoveListener(onMoveListener)
-//        var annotationManager = mapView.annotations.createPolylineAnnotationManager()
-//        annotationManager.annotations =
-
-
-
     }
 
 //    private fun AddMarker(point: Point) {

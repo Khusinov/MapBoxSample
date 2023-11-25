@@ -8,7 +8,12 @@ import androidx.appcompat.content.res.AppCompatResources
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import com.mapbox.android.gestures.MoveGestureDetector
+import com.mapbox.api.directions.v5.models.DirectionsRoute
+import com.mapbox.api.directions.v5.models.DirectionsWaypoint
+import com.mapbox.api.directions.v5.models.LegStep
 import com.mapbox.api.directions.v5.models.RouteOptions
+import com.mapbox.bindgen.Expected
+import com.mapbox.geojson.LineString
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.MapView
@@ -21,6 +26,11 @@ import com.mapbox.maps.extension.style.layers.properties.generated.LineJoin
 import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
 import com.mapbox.maps.extension.style.style
 import com.mapbox.maps.plugin.LocationPuck2D
+import com.mapbox.maps.plugin.annotation.annotations
+import com.mapbox.maps.plugin.annotation.generated.PolylineAnnotation
+import com.mapbox.maps.plugin.annotation.generated.PolylineAnnotationManager
+import com.mapbox.maps.plugin.annotation.generated.PolylineAnnotationOptions
+import com.mapbox.maps.plugin.annotation.generated.createPolylineAnnotationManager
 import com.mapbox.maps.plugin.gestures.OnMoveListener
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorBearingChangedListener
@@ -33,9 +43,21 @@ import com.mapbox.navigation.base.route.NavigationRoute
 import com.mapbox.navigation.base.route.NavigationRouterCallback
 import com.mapbox.navigation.base.route.RouterFailure
 import com.mapbox.navigation.base.route.RouterOrigin
+import com.mapbox.navigation.base.utils.DecodeUtils.completeGeometryToPoints
+import com.mapbox.navigation.base.utils.DecodeUtils.stepGeometryToLineString
+import com.mapbox.navigation.base.utils.DecodeUtils.stepGeometryToPoints
+import com.mapbox.navigation.base.utils.DecodeUtils.stepsGeometryToLineString
 import com.mapbox.navigation.core.MapboxNavigation
+import com.mapbox.navigation.core.RoutesSetCallback
+import com.mapbox.navigation.core.RoutesSetError
+import com.mapbox.navigation.core.RoutesSetSuccess
 import com.mapbox.navigation.core.lifecycle.MapboxNavigationApp
 import com.mapbox.navigation.core.lifecycle.requireMapboxNavigation
+import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineApi
+import com.mapbox.navigation.ui.maps.route.line.api.MapboxRouteLineView
+import com.mapbox.navigation.ui.maps.route.line.model.MapboxRouteLineOptions
+import com.mapbox.navigation.ui.maps.route.line.model.NavigationRouteLine
+import com.mapbox.navigation.ui.maps.route.line.model.RouteLine
 import uz.terrabyte.mapboxsample.databinding.ActivityMainBinding
 import uz.terrabyte.utills.LocationPermissionHelper
 import java.lang.ref.WeakReference
@@ -43,9 +65,15 @@ import java.lang.ref.WeakReference
 
 class MainActivity : AppCompatActivity() {
 
+
     private val mapboxNavigation: MapboxNavigation by requireMapboxNavigation(
         onInitialize = this::initNavigation
     )
+
+    private val mapboxRouteLineOptions by lazy { MapboxRouteLineOptions.Builder(this).build() }
+    private val routeLineApi: MapboxRouteLineApi by lazy { MapboxRouteLineApi(mapboxRouteLineOptions) }
+    private val routeLineView: MapboxRouteLineView by lazy { MapboxRouteLineView(mapboxRouteLineOptions) }
+
     private lateinit var locationPermissionHelper: LocationPermissionHelper
 
     private val onIndicatorBearingChangedListener = OnIndicatorBearingChangedListener {
@@ -69,15 +97,17 @@ class MainActivity : AppCompatActivity() {
         override fun onMoveEnd(detector: MoveGestureDetector) {}
     }
 
+
     private lateinit var mapView: MapView
     private lateinit var binding: ActivityMainBinding
     private lateinit var map: MapboxMap
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        mapView = MapView(this)
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        mapView = binding.mapView
 
         locationPermissionHelper = LocationPermissionHelper(WeakReference(this))
         locationPermissionHelper.checkPermissions {
@@ -101,39 +131,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun fetchARoute() {
 
-        val originPoint = Point.fromLngLat(
-            41.55758213979963, 60.588573882438624
+        val originPoint = Point.fromLngLat(60.588573882438624
+            , 41.55758213979963
         )
-        val destination = Point.fromLngLat(
-            41.550074708879364, 60.58194161940992
+        val destination = Point.fromLngLat( 60.808987130553845,41.46327737134798
         )
 
         val routeOptions = RouteOptions.builder()
-// applies the default parameters to route options
-            .applyDefaultNavigationOptions().applyLanguageAndVoiceUnitOptions(this)
-// lists the coordinate pair i.e. origin and destination
-// If you want to specify waypoints you can pass list of points instead of null
+            .applyDefaultNavigationOptions()
             .coordinatesList(listOf(originPoint, destination))
-// set it to true if you want to receive alternate routes to your destination
+            .waypointsPerRoute(true)
             .alternatives(false)
-// provide the bearing for the origin of the request to ensure
-// that the returned route faces in the direction of the current user movement
-//            .bearingsList(
-//                listOf(
-//                    Bearing.builder()
-//                        .angle(location.bearing.toDouble())
-//                        .degrees(45.0)
-//                        .build(),
-//                    null
-//                )
-//            )
             .build()
         mapboxNavigation.requestRoutes(routeOptions, object : NavigationRouterCallback {
             override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
-// This particular callback is executed if you invoke
-// mapboxNavigation.cancelRouteRequest()
-//                    binding.responseTextView.text = "route request canceled"
-//                    binding.fetchARouteButton.visibility = VISIBLE
             }
 
             override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
@@ -146,16 +157,14 @@ class MainActivity : AppCompatActivity() {
             override fun onRoutesReady(
                 routes: List<NavigationRoute>, routerOrigin: RouterOrigin
             ) {
-// GSON instance used only to print the response prettily
-                val gson = GsonBuilder().setPrettyPrinting().create()
-                val json = routes.map {
-                    gson.toJson(
-                        JsonParser.parseString(it.directionsRoute.toJson())
-                    )
-                }
-                mapboxNavigation.setNavigationRoutes(routes)
 
-                Log.d("TAG", "onRoutesReady: $json")
+
+                mapboxNavigation.setNavigationRoutes(routes) { result ->
+                    Log.d("TAG", "onRoutesSet: ${result.error} and ${result}")
+                }
+
+                // drawRoutes(routes = routes)
+                drawPolyLine(routes.first().directionsRoute.completeGeometryToPoints())
                 //   binding.responseTextView.text = """|routes ready (origin: ${routerOrigin::class.simpleName}):|$json""".trimMargin()
             }
         })
@@ -164,15 +173,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun onMapReady(mapboxMap: MapboxMap) {
 
+        Log.d("TAG", "onMapReady: ready")
         map = mapboxMap
-        mapView.getMapboxMap().setCamera(
-            CameraOptions.Builder().zoom(14.0).build()
-        )
 
         mapView.getMapboxMap().setCamera(
             CameraOptions.Builder().center(
                 Point.fromLngLat(
-                    LATITUDE, LONGITUDE
+                    LONGITUDE, LATITUDE
                 )
             ).zoom(ZOOM).build()
         )
@@ -195,6 +202,52 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupGesturesListener() {
         mapView.gestures.addOnMoveListener(onMoveListener)
+//        var annotationManager = mapView.annotations.createPolylineAnnotationManager()
+//        annotationManager.annotations =
+
+
+
+    }
+
+//    private fun AddMarker(point: Point) {
+//        val annotationApi: AnnotationPlugin = AnnotationPluginImplKt.getAnnotations(mapView)
+//        val circleAnnotationManager: CircleAnnotationManager =
+//            CircleAnnotationManagerKt.createCircleAnnotationManager(
+//                annotationApi,
+//                AnnotationConfig()
+//            )
+//        val circleAnnotationOptions = CircleAnnotationOptions()
+//            .withPoint(point)
+//            .withCircleRadius(7.0)
+//            .withCircleColor("#ee4e8b")
+//            .withCircleStrokeWidth(1.0)
+//            .withDraggable(true)
+//            .withCircleStrokeColor("#ffffff")
+//        circleAnnotationManager.create(circleAnnotationOptions)
+//    }
+
+    private fun drawPolyLine(pointList: List<Point>) {
+
+
+        Log.d("TAG", "drawPolyLine: ${pointList}")
+        val polylineAnnotationManager: PolylineAnnotationManager = mapView.annotations.createPolylineAnnotationManager()
+        val polylineAnnotationOptions = PolylineAnnotationOptions()
+            .withPoints(pointList)
+            .withLineColor("#ee4e8b")
+            .withLineWidth(4.0)
+        polylineAnnotationManager.create(polylineAnnotationOptions)
+
+
+    }
+
+    private fun drawRoutes(routes: List<NavigationRoute>) {
+        val routeLines = routes.map { NavigationRouteLine(it, null) }
+        routeLineApi.setNavigationRouteLines(routeLines) { routeDrawData ->
+            map.getStyle()?.let { mapStyle ->
+                routeLineView.renderRouteDrawData(mapStyle, routeDrawData)
+            }
+        }
+
     }
 
     private fun initLocationComponent() {
@@ -253,8 +306,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val GEOJSON_SOURCE_ID = "line"
-        private const val LATITUDE = -122.486052
-        private const val LONGITUDE = 37.830348
+        private const val LATITUDE = 41.55758213979963
+        private const val LONGITUDE = 60.588573882438624
         private const val ZOOM = 14.0
     }
 
